@@ -1,8 +1,10 @@
+import { bindChordPress } from "./chord-actions";
 import { splitBars, words } from "./sheet";
 
 export const chordReference = /^chord\[([^\]]+)\]$/i;
 export const sheetReference = /^sheet\[([^\]]+)\]$/i;
 export type ChordToken = {start: number; value: string};
+export type ChordActions = {hold: (token: ChordToken) => void; tap: (bar: number, value: string) => void};
 type Bar = {tokens: string[]; sequences: string[]; positions?: ChordToken[]};
 const sequenceMarker = /^\/seq\[([^\]]*)\]$/i;
 
@@ -45,7 +47,7 @@ export async function renderChord(
     source: string,
     container: HTMLElement,
     resolve: (name: string) => Promise<string | undefined>,
-    toggleEmphasis?: (token: ChordToken) => void,
+    actions?: ChordActions,
 ) {
     const lines = [...source.matchAll(/[^\r\n]+/g)].map(match => ({
         text: match[0].trim(),
@@ -73,7 +75,7 @@ export async function renderChord(
         if (ref) references.add(ref);
         const value = resolved[i] ?? line;
         const lineBars = measures(value).map(parseMeasure);
-        if (!ref && toggleEmphasis) {
+        if (!ref && actions) {
             const positions = [...line.matchAll(/[^\s|]+/g)]
                 .filter(match => !sequenceMarker.test(match[0]))
                 .map(match => ({start: start + match.index, value: match[0]}));
@@ -112,12 +114,12 @@ export async function renderChord(
             const cells = measure.createDiv({cls: `lickgo-chord-cells lickgo-chord-count-${tokens.length}`});
             tokens.forEach((token, index) => {
                 const position = bar.positions?.[index];
-                if (toggleEmphasis && position?.value === token) {
+                if (actions && position?.value === token) {
                     const button = cells.createEl("button", {
                         cls: "lickgo-chord-symbol lickgo-chord-button",
-                        attr: {type: "button", title: token, "aria-label": `${token} 강조 전환`, "aria-pressed": String(/^\*\*.+\*\*$/.test(token))},
+                        attr: {type: "button", title: "탭: 주석 · 길게 누르기: 강조", "aria-label": `${token} 마디 주석`, "aria-keyshortcuts": "Shift+Enter"},
                     });
-                    button.onclick = () => toggleEmphasis(position);
+                    bindChordPress(button, () => actions.tap(i + col, annotations[i / 4]?.[col] ?? ""), () => actions.hold(position));
                     renderToken(button, token);
                 } else {
                     renderToken(cells.createSpan({cls: "lickgo-chord-symbol", attr: {title: token}}), token);

@@ -94,12 +94,9 @@ class MusicKeyboard extends Modal {
             for (const key of row) {
                 const label = key === "h" ? "ø" : key.replace(/b/g, "♭").replace(/#/g, "♯").replace(/^n$/, "♮");
                 const token = (isRhythm && index < 2) || (!isRhythm && field !== "chords" && key === "!");
-                const trailingSpace = key !== "!" && (token ||
-                    (field === "chords" && ["6", "7", "9", "11", "13"].includes(key)) ||
-                    (!isRhythm && field !== "chords" && index === 3));
                 const display = isRhythm && index === 3 ? `×${label}` : label;
                 const value = isRhythm && index === 3 ? `*${key}` : key;
-                this.button(element, display, () => this.insertKey(value, token || value.startsWith("*") && value.length > 1, trailingSpace, field));
+                this.button(element, display, () => this.insertKey(value, token || value.startsWith("*") && value.length > 1, field));
             }
         });
         this.drawPreview();
@@ -129,22 +126,12 @@ class MusicKeyboard extends Modal {
         this.drawPreview();
     }
 
-    private insertKey(value: string, token: boolean, trailingSpace: boolean, field: Field) {
+    private insertKey(value: string, token: boolean, field: Field) {
         const {anchor, caret, value: current} = this.lane;
         const from = Math.min(anchor, caret);
         const to = Math.max(anchor, caret);
         const before = current.slice(0, from);
         const after = current.slice(to);
-        if (field !== "chords" && before.endsWith(" ")) {
-            if (value === "-") {
-                this.replace(before.replace(/ +$/, "").length, to, value);
-                return;
-            }
-            if (value === "~") {
-                this.replace(from - 1, to, "~ ");
-                return;
-            }
-        }
         const root = /^[A-G]/.test(value);
         const partOfVoicing = before.endsWith("-");
         const slashBass = field === "chords" && before.endsWith("/");
@@ -152,23 +139,13 @@ class MusicKeyboard extends Modal {
         if ((token || root || value === "|" || value === "!") && before && !/[\s|]$/.test(before) &&
             !partOfVoicing && !slashBass && !rhythmRest) value = " " + value;
         if (value.trim() === "|" && after && !/^[\s|]/.test(after)) value += " ";
-        if (trailingSpace) {
-            if (after.startsWith(" ")) {
-                this.replace(from, to + 1, value + " ");
-                return;
-            }
-            value += " ";
-        }
         this.insert(value);
     }
 
     private insert(value: string) {
-        const {anchor, caret} = this.lane;
-        this.replace(Math.min(anchor, caret), Math.max(anchor, caret), value);
-    }
-
-    private replace(from: number, to: number, value: string) {
         const lane = this.lane;
+        const from = Math.min(lane.anchor, lane.caret);
+        const to = Math.max(lane.anchor, lane.caret);
         lane.value = lane.value.slice(0, from) + value + lane.value.slice(to);
         lane.anchor = lane.caret = from + value.length;
         this.drawPreview();

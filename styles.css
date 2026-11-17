@@ -176,3 +176,11 @@
 @container (max-width: 420px) {
     .lickgo-chord-cells .lickgo-chord-button { width: auto; }
 }
+
+.lickgo-chord-cells .lickgo-chord-button {
+    -webkit-touch-callout: none;
+    user-select: none;
+    touch-action: pan-y;
+}
+
+.lickgo-chord-annotation-input { width: 100%; }

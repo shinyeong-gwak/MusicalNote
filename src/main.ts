@@ -8,7 +8,8 @@ import { syntaxTree } from "@codemirror/language";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type ViewUpdate } from "@codemirror/view";
 import { findBlocks } from "./blocks";
 import { openMusicKeyboard } from "./keyboard";
-import { chordReference, renderChord, sheetReference, type ChordToken } from "./chord";
+import { chordReference, renderChord, sheetReference, type ChordActions } from "./chord";
+import { ChordAnnotationModal, editAnnotation } from "./chord-actions";
 import { fields, parseSheet, splitBars, toMusicXml, words } from "./sheet";
 import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 
@@ -46,8 +47,20 @@ export default class LickGoNote extends Plugin {
             void this.renderSheet(source, this.child(el, ctx));
         });
         this.registerMarkdownCodeBlockProcessor("chord", (source, el, ctx) => {
-            void this.renderChart(source, ctx.sourcePath, this.child(el, ctx), undefined,
-                token => void this.toggleChord(ctx.sourcePath, source, token, el, ctx.getSectionInfo(el)));
+            const edit = (change: (text: string, offset: number) => string) =>
+                void this.editChord(ctx.sourcePath, source, el, ctx.getSectionInfo(el), change);
+            void this.renderChart(source, ctx.sourcePath, this.child(el, ctx), undefined, {
+                hold: token => edit((text, offset) => {
+                    const start = token.start + offset;
+                    const end = start + token.value.length;
+                    if (text.slice(start, end) !== token.value) throw new Error("코드 위치가 변경되었습니다.");
+                    const replacement = /^\*\*.+\*\*$/.test(token.value)
+                        ? token.value.slice(2, -2) : `**${token.value}**`;
+                    return text.slice(0, start) + replacement + text.slice(end);
+                }),
+                tap: (bar, value) => new ChordAnnotationModal(this.app, bar, value, text =>
+                    edit(source => editAnnotation(source, Math.floor(bar / 4), bar % 4, text))).open(),
+            });
         });
         this.registerMarkdownPostProcessor((el, ctx) => {
             for (const paragraph of el.querySelectorAll("p")) {
@@ -191,11 +204,8 @@ export default class LickGoNote extends Plugin {
         child.containerEl.createDiv({cls: "lickgo-status", text: message});
     }
 
-    private async toggleChord(path: string, source: string, token: ChordToken,
-        el: HTMLElement, section: MarkdownSectionInformation | null) {
-        const localOffset = token.start - (source.length - source.trimStart().length);
-        const replacement = /^\*\*.+\*\*$/.test(token.value)
-            ? token.value.slice(2, -2) : `**${token.value}**`;
+    private async editChord(path: string, source: string, el: HTMLElement,
+        section: MarkdownSectionInformation | null, change: (text: string, offset: number) => string) {
         const locate = (markdown: string) => {
             const candidates = findBlocks(markdown).filter(block => block.language === "chord" && block.text.trim() === source.trim());
             const nearby = section ? candidates.filter(block => {
@@ -204,9 +214,9 @@ export default class LickGoNote extends Plugin {
             }) : [];
             const block = nearby.length === 1 ? nearby[0] : candidates.length === 1 ? candidates[0] : undefined;
             if (!block) return;
-            const start = block.start + block.text.length - block.text.trimStart().length + localOffset;
-            const end = start + token.value.length;
-            if (markdown.slice(start, end) === token.value) return {start, end};
+            const offset = block.text.length - block.text.trimStart().length
+                - (source.length - source.trimStart().length);
+            return {start: block.start, end: block.start + block.text.length, text: change(block.text, offset)};
         };
         try {
             const views = this.app.workspace.getLeavesOfType("markdown")
@@ -216,7 +226,7 @@ export default class LickGoNote extends Plugin {
             if (editor) {
                 const range = locate(editor.getValue());
                 if (range) {
-                    editor.replaceRange(replacement, editor.offsetToPos(range.start), editor.offsetToPos(range.end));
+                    editor.replaceRange(range.text, editor.offsetToPos(range.start), editor.offsetToPos(range.end));
                     return;
                 }
             } else {
@@ -227,22 +237,22 @@ export default class LickGoNote extends Plugin {
                         const range = locate(markdown);
                         if (!range) return markdown;
                         replaced = true;
-                        return markdown.slice(0, range.start) + replacement + markdown.slice(range.end);
+                        return markdown.slice(0, range.start) + range.text + markdown.slice(range.end);
                     });
                     if (replaced) return;
                 }
             }
             new Notice("코드 위치를 확인할 수 없습니다. 블록을 다시 열어 주세요.");
         } catch (error) {
-            new Notice(`코드 강조를 적용하지 못했습니다. ${(error as Error).message}`);
+            new Notice(`코드 편집을 적용하지 못했습니다. ${(error as Error).message}`);
         }
     }
 
     private async renderChart(source: string, path: string, child: RenderedMusic, liveText?: string,
-        toggleEmphasis?: (token: ChordToken) => void) {
+        actions?: ChordActions) {
         try {
             const output = child.containerEl.createDiv({cls: "lickgo-music"});
-            await renderChord(source, output, name => this.findReference(name, path, "chord", liveText), toggleEmphasis);
+            await renderChord(source, output, name => this.findReference(name, path, "chord", liveText), actions);
             if (child.disposed) output.remove();
         } catch (error) {
             this.status(child, (error as Error).message);
