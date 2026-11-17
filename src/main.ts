@@ -1,14 +1,14 @@
 import {
-    editorInfoField, editorLivePreviewField, MarkdownRenderChild, MarkdownView,
+    editorInfoField, editorLivePreviewField, MarkdownRenderChild, MarkdownView, Notice,
     Menu, normalizePath, Plugin, TFile,
-    type Editor, type MarkdownPostProcessorContext,
+    type Editor, type MarkdownPostProcessorContext, type MarkdownSectionInformation,
 } from "obsidian";
 import type { Text } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type ViewUpdate } from "@codemirror/view";
 import { findBlocks } from "./blocks";
 import { openMusicKeyboard } from "./keyboard";
-import { chordReference, renderChord, sheetReference } from "./chord";
+import { chordReference, renderChord, sheetReference, type ChordToken } from "./chord";
 import { fields, parseSheet, splitBars, toMusicXml, words } from "./sheet";
 import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 
@@ -46,7 +46,8 @@ export default class LickGoNote extends Plugin {
             void this.renderSheet(source, this.child(el, ctx));
         });
         this.registerMarkdownCodeBlockProcessor("chord", (source, el, ctx) => {
-            void this.renderChart(source, ctx.sourcePath, this.child(el, ctx));
+            void this.renderChart(source, ctx.sourcePath, this.child(el, ctx), undefined,
+                token => void this.toggleChord(ctx.sourcePath, source, token, el, ctx.getSectionInfo(el)));
         });
         this.registerMarkdownPostProcessor((el, ctx) => {
             for (const paragraph of el.querySelectorAll("p")) {
@@ -190,10 +191,58 @@ export default class LickGoNote extends Plugin {
         child.containerEl.createDiv({cls: "lickgo-status", text: message});
     }
 
-    private async renderChart(source: string, path: string, child: RenderedMusic, liveText?: string) {
+    private async toggleChord(path: string, source: string, token: ChordToken,
+        el: HTMLElement, section: MarkdownSectionInformation | null) {
+        const localOffset = token.start - (source.length - source.trimStart().length);
+        const replacement = /^\*\*.+\*\*$/.test(token.value)
+            ? token.value.slice(2, -2) : `**${token.value}**`;
+        const locate = (markdown: string) => {
+            const candidates = findBlocks(markdown).filter(block => block.language === "chord" && block.text.trim() === source.trim());
+            const nearby = section ? candidates.filter(block => {
+                const line = markdown.slice(0, block.opening).split("\n").length - 1;
+                return line >= section.lineStart && line <= section.lineEnd;
+            }) : [];
+            const block = nearby.length === 1 ? nearby[0] : candidates.length === 1 ? candidates[0] : undefined;
+            if (!block) return;
+            const start = block.start + block.text.length - block.text.trimStart().length + localOffset;
+            const end = start + token.value.length;
+            if (markdown.slice(start, end) === token.value) return {start, end};
+        };
+        try {
+            const views = this.app.workspace.getLeavesOfType("markdown")
+                .map(leaf => leaf.view)
+                .filter((view): view is MarkdownView => view instanceof MarkdownView && view.file?.path === path && view.getMode() === "source");
+            const editor = (views.find(view => view.containerEl.contains(el)) ?? views[0])?.editor;
+            if (editor) {
+                const range = locate(editor.getValue());
+                if (range) {
+                    editor.replaceRange(replacement, editor.offsetToPos(range.start), editor.offsetToPos(range.end));
+                    return;
+                }
+            } else {
+                const file = this.app.vault.getAbstractFileByPath(path);
+                if (file instanceof TFile) {
+                    let replaced = false;
+                    await this.app.vault.process(file, markdown => {
+                        const range = locate(markdown);
+                        if (!range) return markdown;
+                        replaced = true;
+                        return markdown.slice(0, range.start) + replacement + markdown.slice(range.end);
+                    });
+                    if (replaced) return;
+                }
+            }
+            new Notice("코드 위치를 확인할 수 없습니다. 블록을 다시 열어 주세요.");
+        } catch (error) {
+            new Notice(`코드 강조를 적용하지 못했습니다. ${(error as Error).message}`);
+        }
+    }
+
+    private async renderChart(source: string, path: string, child: RenderedMusic, liveText?: string,
+        toggleEmphasis?: (token: ChordToken) => void) {
         try {
             const output = child.containerEl.createDiv({cls: "lickgo-music"});
-            await renderChord(source, output, name => this.findReference(name, path, "chord", liveText));
+            await renderChord(source, output, name => this.findReference(name, path, "chord", liveText), toggleEmphasis);
             if (child.disposed) output.remove();
         } catch (error) {
             this.status(child, (error as Error).message);

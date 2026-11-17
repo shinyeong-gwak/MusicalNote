@@ -2,7 +2,9 @@ import { splitBars, words } from "./sheet";
 
 export const chordReference = /^chord\[([^\]]+)\]$/i;
 export const sheetReference = /^sheet\[([^\]]+)\]$/i;
-type Bar = {tokens: string[]; sequences: string[]};
+export type ChordToken = {start: number; value: string};
+type Bar = {tokens: string[]; sequences: string[]; positions?: ChordToken[]};
+const sequenceMarker = /^\/seq\[([^\]]*)\]$/i;
 
 function measures(text: string) {
     return splitBars(text.replace(/\|\s*\n\s*\|/g, "|"));
@@ -43,10 +45,14 @@ export async function renderChord(
     source: string,
     container: HTMLElement,
     resolve: (name: string) => Promise<string | undefined>,
+    toggleEmphasis?: (token: ChordToken) => void,
 ) {
-    const lines = source.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-    const resolved = await Promise.all(lines.map(line => {
-        const name = chordReference.exec(line)?.[1];
+    const lines = [...source.matchAll(/[^\r\n]+/g)].map(match => ({
+        text: match[0].trim(),
+        start: match.index + match[0].length - match[0].trimStart().length,
+    })).filter(line => line.text);
+    const resolved = await Promise.all(lines.map(({text}) => {
+        const name = chordReference.exec(text)?.[1];
         return name ? resolve(name) : undefined;
     }));
     const bars: Bar[] = [];
@@ -54,7 +60,7 @@ export async function renderChord(
     const references = new Set<string>();
     const missing = new Set<string>();
     let pending: string[] = [];
-    lines.forEach((line, i) => {
+    lines.forEach(({text: line, start}, i) => {
         if (line.startsWith(">")) {
             annotations.push(measures(line.slice(1)));
             return;
@@ -67,6 +73,16 @@ export async function renderChord(
         if (ref) references.add(ref);
         const value = resolved[i] ?? line;
         const lineBars = measures(value).map(parseMeasure);
+        if (!ref && toggleEmphasis) {
+            const positions = [...line.matchAll(/[^\s|]+/g)]
+                .filter(match => !sequenceMarker.test(match[0]))
+                .map(match => ({start: start + match.index, value: match[0]}));
+            let offset = 0;
+            for (const bar of lineBars) {
+                bar.positions = positions.slice(offset, offset + bar.tokens.length);
+                offset += bar.tokens.length;
+            }
+        }
         if (!value.includes("|") && lineBars.every(bar => !bar.tokens.length)) {
             pending.push(...lineBars.flatMap(bar => bar.sequences));
             return;
@@ -94,7 +110,19 @@ export async function renderChord(
             if (bar.sequences.length) measure.createDiv({cls: "lickgo-sequences", text: bar.sequences.map(id => `/seq[${id}]`).join(" ")});
             const tokens = bar.tokens.slice(0, 4);
             const cells = measure.createDiv({cls: `lickgo-chord-cells lickgo-chord-count-${tokens.length}`});
-            for (const token of tokens) renderToken(cells.createSpan({cls: "lickgo-chord-symbol", attr: {title: token}}), token);
+            tokens.forEach((token, index) => {
+                const position = bar.positions?.[index];
+                if (toggleEmphasis && position?.value === token) {
+                    const button = cells.createEl("button", {
+                        cls: "lickgo-chord-symbol lickgo-chord-button",
+                        attr: {type: "button", title: token, "aria-label": `${token} 강조 전환`, "aria-pressed": String(/^\*\*.+\*\*$/.test(token))},
+                    });
+                    button.onclick = () => toggleEmphasis(position);
+                    renderToken(button, token);
+                } else {
+                    renderToken(cells.createSpan({cls: "lickgo-chord-symbol", attr: {title: token}}), token);
+                }
+            });
         }
         const marks = annotations[i / 4];
         if (marks) {

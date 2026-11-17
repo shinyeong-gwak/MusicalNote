@@ -156,3 +156,23 @@
 .lickgo-keyboard-actions {
     justify-content: flex-end;
 }
+
+.lickgo-chord-cells .lickgo-chord-button {
+    appearance: none;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    color: inherit;
+    text-align: start;
+    touch-action: manipulation;
+    cursor: pointer;
+}
+
+@container (max-width: 420px) {
+    .lickgo-chord-cells .lickgo-chord-button { width: auto; }
+}
