@@ -1,0 +1,17 @@
+{
+  "name": "lickgo-note",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc --noEmit && esbuild src/main.ts --bundle --platform=browser --target=es2018 --format=cjs --external:obsidian --external:@codemirror/* --minify --legal-comments=linked --outfile=main.js"
+  },
+  "dependencies": {
+    "opensheetmusicdisplay": "1.9.2"
+  },
+  "devDependencies": {
+    "@codemirror/language": "^6.10.8",
+    "esbuild": "^0.25.0",
+    "obsidian": "1.14.4",
+    "typescript": "^5.9.3"
+  }
+}

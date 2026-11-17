@@ -1,0 +1,31 @@
+name: BRAT beta release
+
+on:
+  push:
+    tags:
+      - '[0-9]*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Check version
+        run: |
+          node -e 'const version = require("./manifest.json").version; if (version !== process.env.GITHUB_REF_NAME) throw new Error("Tag must match manifest.json version: " + version)'
+      - run: npm ci
+      - run: npm run build
+      - name: Publish beta release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            manifest.json main.js styles.css main.js.LEGAL.txt opensheetmusicdisplay.LICENSE.txt \
+            --verify-tag --prerelease --title "$GITHUB_REF_NAME" --generate-notes

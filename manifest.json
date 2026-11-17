@@ -1,0 +1,9 @@
+{
+  "id": "lickgo-note",
+  "name": "LickGo Note",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Render LickGo chord charts and sheet music in Obsidian notes.",
+  "author": "LickGo",
+  "isDesktopOnly": false
+}
