@@ -6,31 +6,14 @@ import {
 import type { Text } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type ViewUpdate } from "@codemirror/view";
+import { findBlocks } from "./blocks";
+import { openMusicKeyboard } from "./keyboard";
 import { chordReference, renderChord, sheetReference } from "./chord";
 import { fields, parseSheet, splitBars, toMusicXml, words } from "./sheet";
 import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 
 const sheetTemplate = "```sheet\n\n" + fields.map(field => field + "\n---\n").join("\n\n") + "\n```";
 const chordTemplate = "```chord\n| \n```";
-const fence = /^ {0,3}(`{3,}|~{3,})\s*([^\s`~]*)/;
-
-function findBlocks(markdown: string) {
-    const result: {language: string; text: string}[] = [];
-    let active: { marker: string; language: string; lines: string[] } | undefined;
-    for (const line of markdown.split(/\r?\n/)) {
-        const match = fence.exec(line);
-        if (!active) {
-            if (match) active = {marker: match[1], language: match[2].toLowerCase(), lines: []};
-        } else if (match && match[1][0] === active.marker[0] && match[1].length >= active.marker.length && !line.slice(match[0].length).trim() && !match[2]) {
-            result.push({language: active.language, text: active.lines.join("\n")});
-            active = undefined;
-        } else {
-            active.lines.push(line);
-        }
-    }
-    return result;
-}
-
 class RenderedMusic extends MarkdownRenderChild {
     disposed = false;
     onunload() { this.disposed = true; }
@@ -82,12 +65,18 @@ export default class LickGoNote extends Plugin {
         this.registerLiveReferences();
         this.addCommand({id: "insert-sheet", name: "악보 블록 삽입", icon: "music", editorCallback: editor => this.insert(editor, "sheet")});
         this.addCommand({id: "insert-chord", name: "코드 블록 삽입", icon: "list-music", editorCallback: editor => this.insert(editor, "chord")});
+        this.addCommand({
+            id: "music-keyboard", name: "음악 키보드 열기", icon: "keyboard",
+            editorCallback: (editor, ctx) => openMusicKeyboard(this.app, editor, ctx),
+        });
         this.addRibbonIcon("music", "LickGo Note", event => {
             const view = this.app.workspace.getActiveViewOfType(MarkdownView);
             if (!view) return;
             const menu = new Menu();
             menu.addItem(item => item.setTitle("악보 블록 삽입").setIcon("music").onClick(() => this.insert(view.editor, "sheet")));
             menu.addItem(item => item.setTitle("코드 블록 삽입").setIcon("list-music").onClick(() => this.insert(view.editor, "chord")));
+            menu.addItem(item => item.setTitle("음악 키보드 열기").setIcon("keyboard")
+                .onClick(() => openMusicKeyboard(this.app, view.editor, view)));
             menu.showAtMouseEvent(event);
         });
     }

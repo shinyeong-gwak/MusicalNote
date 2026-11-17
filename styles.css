@@ -104,3 +104,55 @@
 .theme-dark .lickgo-score > div {
     filter: invert(1);
 }
+
+.lickgo-keyboard-modal .modal-content {
+    overflow-y: auto;
+}
+
+.lickgo-keyboard-tabs,
+.lickgo-keyboard-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-block: 8px;
+}
+
+.lickgo-keyboard-tabs button[aria-pressed="true"] {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.lickgo-keyboard-preview {
+    min-height: 3em;
+    max-height: 7em;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    padding: 8px;
+    background: var(--background-secondary);
+}
+
+.lickgo-keyboard-caret {
+    border-inline-start: 2px solid var(--interactive-accent);
+}
+
+.lickgo-keyboard-selection {
+    background: var(--text-selection);
+}
+
+.lickgo-keyboard-row {
+    display: flex;
+    gap: 4px;
+    margin-block: 4px;
+}
+
+.lickgo-keyboard-row button {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 36px;
+    padding-inline: 0;
+}
+
+.lickgo-keyboard-actions {
+    justify-content: flex-end;
+}

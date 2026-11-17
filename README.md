@@ -4,9 +4,9 @@ LickGo의 Note 문법과 악보 입력을 Obsidian 보관함에서 사용합니�
 
 ## BRAT으로 설치
 
-GitHub 릴리스 게시 후 iOS 또는 데스크톱 Obsidian에서 **BRAT: Add a beta plugin for testing**을 실행합니다. 플러그인 GitHub 저장소 주소를 넣고 **Latest version** 또는 `0.1.0`을 선택합니다. 설치 후 커뮤니티 플러그인에서 **LickGo Note**를 활성화합니다.
+GitHub 릴리스 게시 후 iOS 또는 데스크톱 Obsidian에서 **BRAT: Add a beta plugin for testing**을 실행합니다. 플러그인 GitHub 저장소 주소를 넣고 **Latest version**을 선택합니다. 설치 후 커뮤니티 플러그인에서 **LickGo Note**를 활성화합니다.
 
-릴리스 태그와 이름은 `0.1.0`이며, GitHub Releases에 `manifest.json`, `main.js`, `styles.css`를 개별 파일로 첨부합니다. 비공개 저장소의 경우 BRAT에 해당 저장소의 Contents 읽기 권한이 있는 토큰을 등록해야 합니다. [BRAT 개발자 가이드](https://github.com/TfTHacker/obsidian42-brat/blob/main/BRAT-DEVELOPER-GUIDE.md)
+릴리스 태그와 이름은 `manifest.json`의 버전과 일치해야 하며, GitHub Releases에 `manifest.json`, `main.js`, `styles.css`를 개별 파일로 첨부합니다. 비공개 저장소의 경우 BRAT에 해당 저장소의 Contents 읽기 권한이 있는 토큰을 등록해야 합니다. [BRAT 개발자 가이드](https://github.com/TfTHacker/obsidian42-brat/blob/main/BRAT-DEVELOPER-GUIDE.md)
 
 ## 수동 설치
 
@@ -15,6 +15,12 @@ GitHub 릴리스 게시 후 iOS 또는 데스크톱 Obsidian에서 **BRAT: Add a
 3. Obsidian을 다시 열고 커뮤니티 플러그인에서 **LickGo Note**를 활성화합니다. 모바일에서 보관함을 동기화하는 경우 플러그인 파일도 모바일 기기에 복사되어 있어야 합니다.
 
 데스크톱에서는 리본의 음표 아이콘 또는 명령 팔레트를 사용합니다. 모바일에서는 **설정 → 인터페이스 → 모바일 툴바 설정 → 명령 추가**에서 **LickGo Note: 악보 블록 삽입**과 **LickGo Note: 코드 블록 삽입**을 고를 수 있습니다. [Obsidian 모바일 툴바 안내](https://help.obsidian.md/mobile#Mobile+toolbar)
+
+## 음악 키보드
+
+모바일 툴바의 **명령 추가**에서 **LickGo Note: 음악 키보드 열기**를 추가합니다. 데스크톱에서는 명령 팔레트나 리본 메뉴에서 열 수 있습니다.
+
+`sheet` 또는 `chord` 블록 안에 커서를 놓고 명령을 실행합니다. 패널 안에서 항목을 바꾸고 음악 버튼으로 입력한 뒤 **적용**을 누르면 노트에 저장됩니다. **취소**하면 패널에서 입력한 내용이 버려집니다.
 
 ## 코드 진행
 
