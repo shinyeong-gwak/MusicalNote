@@ -10,6 +10,7 @@ import { findBlocks } from "./blocks";
 import { openMusicKeyboard } from "./keyboard";
 import { chordReference, renderChord, sheetReference, type ChordActions } from "./chord";
 import { ChordAnnotationModal, editAnnotation } from "./chord-actions";
+import { addPianoPlayer } from "./player";
 import { fields, parseSheet, splitBars, toMusicXml, words } from "./sheet";
 import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 
@@ -269,6 +270,7 @@ export default class LickGoNote extends Plugin {
             }
             const wrapper = child.containerEl.createDiv({cls: "lickgo-music"});
             if (sheet.name) wrapper.createDiv({cls: "lickgo-caption", text: sheet.name});
+            addPianoPlayer(wrapper, xml, child);
             const frame = wrapper.createDiv({cls: "lickgo-score-frame"});
             const output = frame.createDiv({cls: "lickgo-score"});
             const display = new OpenSheetMusicDisplay(output, {
