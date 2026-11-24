@@ -1,7 +1,7 @@
 // Port of LickGo's parser.py, normalize.py and music_theory.py.
 export const fields = ["chords", "melody", "melody_rhythm", "voicing", "voicing_rhythm"] as const;
 type Field = typeof fields[number];
-type Source = Record<Field, string> & {key: string; time: string; grid: number; name: string};
+type Source = Record<Field, string> & {key: string; time: string; grid: number; tempo?: number; name: string};
 export const words = (text: string) => text.trim().split(/\s+/).filter(Boolean);
 const rhythms = {
     1: [480, "whole"], 2: [240, "half"], 4: [120, "quarter"], 8: [60, "eighth"],
@@ -36,6 +36,21 @@ export function parseSheet(text: string): Source {
         } else if (field) {
             result[field] += lines[i] + "\n";
         } else if (label) {
+            const header = /^(?:Tempo|Time|Q|M):/i.test(label);
+            if (header) {
+                const options = [...label.matchAll(/(Tempo|Time|Q|M):[ \t]*(?:1\/4[ \t]*=[ \t]*)?(\d+(?:\/\d+)?)/gi)];
+                const leftover = label.replace(/(Tempo|Time|Q|M):[ \t]*(?:1\/4[ \t]*=[ \t]*)?(\d+(?:\/\d+)?)/gi, "").trim();
+                if (!options.length || leftover) throw new Error(`올바르지 않은 Tempo/Time 설정: ${label}`);
+                for (const [, option, value] of options) {
+                    if (/^(Time|M)$/i.test(option)) result.time = value;
+                    else {
+                        const tempo = Number(value);
+                        if (!Number.isFinite(tempo) || tempo <= 0) throw new Error("Tempo는 양수 BPM이어야 합니다.");
+                        result.tempo = tempo;
+                    }
+                }
+                continue;
+            }
             const option = /^(key|time|grid|name):\s*(.+)$/.exec(label);
             if (!option) throw new Error(`악보 항목 앞에 올 수 없는 내용: ${label}`);
             const [, key, value] = option;
@@ -48,8 +63,11 @@ export function parseSheet(text: string): Source {
 }
 
 export function splitBars(source: string) {
-    const text = source.trim();
+    let text = source.replace(/\r\n?/g, "\n").trim();
     if (!text) return [];
+    while (/\|[^\S\n]*\n\s*\|/.test(text)) {
+        text = text.replace(/\|[^\S\n]*\n\s*\|/g, "|");
+    }
     const bars = text.split("|").map(bar => bar.trim());
     if (text.startsWith("|")) bars.shift();
     if (text.endsWith("|")) bars.pop();
@@ -103,7 +121,8 @@ function buildHand(source: string, rhythmSource: string, hand: Hand, grid: Rhyth
     const result: Note[] = [];
     let index = 0;
     if (!tokens.length) {
-        if (notes.length > grid) throw new Error(`${label} 음표 개수가 Grid(${grid})보다 많습니다.`);
+        const capacity = Math.floor(length / rhythms[grid][0]);
+        if (notes.length > capacity) throw new Error(`${label} 음표 개수가 마디 용량(${capacity})보다 많습니다.`);
         result.push(...notes.map(note => ({...note, value: grid})));
     }
     for (let i = 0; i < tokens.length; i++) {
@@ -299,7 +318,7 @@ export function toMusicXml(source: Source): string | null {
             if (!i) notes += addHarmonies(length);
             return `${i ? `<backup><duration>${renderedLength(hands[0]) * 84}</duration></backup>` : ""}${notes}`;
         }).join("");
-        return `<measure number="${number}"${measure.pickup ? ' implicit="yes"' : ""}>${index ? "" : attributes}${staves}</measure>`;
+        return `<measure number="${number}"${measure.pickup ? ' implicit="yes"' : ""}>${index ? "" : attributes}${!index && source.tempo ? `<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${source.tempo}</per-minute></metronome></direction-type><sound tempo="${source.tempo}"/></direction>` : ""}${staves}</measure>`;
     }).join("");
     return `<?xml version="1.0" encoding="UTF-8"?><score-partwise version="3.1"><part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list><part id="P1">${contents}</part></score-partwise>`;
 }

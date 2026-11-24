@@ -13,7 +13,7 @@ import { ChordAnnotationModal, editAnnotation } from "./chord-actions";
 import { fields, parseSheet, splitBars, toMusicXml, words } from "./sheet";
 import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 
-const sheetTemplate = "```sheet\n\n" + fields.map(field => field + "\n---\n").join("\n\n") + "\n```";
+const sheetTemplate = "```sheet\nTempo: 120 Time: 4/4\n\n" + fields.map(field => field + "\n---\n").join("\n\n") + "\n```";
 const chordTemplate = "```chord\n| \n```";
 class RenderedMusic extends MarkdownRenderChild {
     disposed = false;
@@ -151,7 +151,7 @@ export default class LickGoNote extends Plugin {
         let template = type === "sheet" ? sheetTemplate : chordTemplate;
         if (selected) template = type === "sheet" ? template.replace("chords\n---\n", () => "chords\n---\n" + selected) : "```chord\n" + selected + "\n```";
         editor.replaceRange(prefix + template + suffix, from, to);
-        editor.setCursor({line: from.line + (before ? 2 : 0) + (type === "sheet" ? 4 : 1), ch: type === "chord" && !selected ? 2 : 0});
+        editor.setCursor({line: from.line + (before ? 2 : 0) + (type === "sheet" ? 5 : 1), ch: type === "chord" && !selected ? 2 : 0});
         editor.focus();
     }
 
