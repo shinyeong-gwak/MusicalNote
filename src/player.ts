@@ -68,6 +68,20 @@ function piano(context: AudioContext, midi: number) {
     return buffer;
 }
 
+// Warp each quarter-note beat into a long/short eighth-note pair.
+export function swingBeat(beat: number) {
+    const whole = Math.floor(beat);
+    const fraction = beat - whole;
+    return whole + (fraction <= 0.5 ? fraction * 4 / 3 : 2 / 3 + (fraction - 0.5) * 2 / 3);
+}
+
+export function swingNotes(notes: PlaybackNote[]) {
+    return notes.map(note => ({
+        ...note, beat: swingBeat(note.beat),
+        length: swingBeat(note.beat + note.length) - swingBeat(note.beat),
+    }));
+}
+
 let stopOtherPlayer: (() => void) | undefined;
 
 export function addPianoPlayer(container: HTMLElement, xml: string, owner: Component) {
@@ -78,6 +92,10 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
     const label = toolbar.createEl("label", {text: "BPM "});
     const tempo = label.createEl("input", {type: "number", attr: {min: "1", max: "999", "aria-label": "재생 BPM"}});
     tempo.value = String(score.tempo);
+    const swingLabel = toolbar.createEl("label", {cls: "lickgo-swing"});
+    const swing = swingLabel.createEl("input", {type: "checkbox", attr: {type: "checkbox", "aria-label": "8분음표 스윙"}});
+    swing.checked = true;
+    swingLabel.createSpan({text: "8분 스윙"});
     const status = toolbar.createSpan({cls: "lickgo-status", text: "피아노"});
     play.disabled = !score.notes.length;
     if (!score.notes.length) status.setText("재생할 음표가 없습니다.");
@@ -90,6 +108,7 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
     let bpm = score.tempo;
     let timer: number | undefined;
     let next = 0;
+    let notes = swingNotes(score.notes);
     const voices = new Set<AudioBufferSourceNode>();
     const cache = new Map<number, AudioBuffer>();
     const position = () => running && context ? beat + Math.max(0, context.currentTime - started) * bpm / 60 : beat;
@@ -115,8 +134,8 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
     const schedule = () => {
         if (!context || !running) return;
         const current = position();
-        while (next < score.notes.length && score.notes[next].beat <= current + bpm / 60 * 0.15) {
-            const note = score.notes[next++];
+        while (next < notes.length && notes[next].beat <= current + bpm / 60 * 0.15) {
+            const note = notes[next++];
             if (note.beat + note.length <= beat) continue;
             const noteStart = Math.max(beat, note.beat);
             const time = Math.max(context.currentTime, started + (noteStart - beat) * 60 / bpm);
@@ -150,6 +169,7 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
             if (stopOtherPlayer && stopOtherPlayer !== reset) stopOtherPlayer();
             stopOtherPlayer = reset;
             bpm = value;
+            notes = swing.checked ? swingNotes(score.notes) : score.notes;
             next = 0;
             started = context.currentTime + 0.05;
             running = true;
@@ -167,6 +187,7 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
     };
     stop.onclick = reset;
     tempo.onchange = () => { if (running) pause(); };
+    swing.onchange = reset;
     owner.register(() => {
         disposed = true;
         reset();
