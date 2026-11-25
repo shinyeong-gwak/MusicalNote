@@ -80,3 +80,8 @@ voicing_rhythm
 MusicXML 변환은 LickGo의 파서 동작을 TypeScript로 옮겼고, 렌더러는 LickGo Note와 같은 OpenSheetMusicDisplay 1.9.2를 번들에 포함합니다. LickGo의 Python / music21 출력과 MusicXML 파일 구조나 조판 세부는 달라질 수 있습니다.
 
 소스에서 빌드하려면 `npm ci`와 `npm run build`를 실행합니다.
+
+
+## 공용 악보 엔진
+
+파서와 MusicXML 변환, 악보 렌더러는 [packages/score-engine](packages/score-engine/README.md)에 있습니다. Obsidian은 이 패키지를 직접 사용하고, LickGo에는 `npm run sync:lickgo -- /path/to/PleasePracticeJazz`로 같은 소스의 브라우저 번들을 전달합니다. 입력 문법이나 조판 변경은 공용 패키지에서 수정합니다.

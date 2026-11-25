@@ -1,0 +1,21 @@
+{
+  "name": "@lickgo/score-engine",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "opensheetmusicdisplay": "1.9.2"
+  },
+  "module": "./dist/index.mjs",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ]
+}

@@ -10,7 +10,7 @@ import { chordReference, renderChord, sheetReference, type ChordActions } from "
 import { ChordAnnotationModal, editAnnotation } from "./chord-actions";
 import { addPianoPlayer } from "./player";
 import { fields, parseSheet, splitBars, toMusicXml, words } from "./sheet";
-import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
+import { renderMusicXml } from "@lickgo/score-engine";
 
 const sheetTemplate = "```sheet\nTempo: 120 Time: 4/4\n\n" + fields.map(field => field + "\n---\n").join("\n\n") + "\n```";
 const chordTemplate = "```chord\n| \n```";
@@ -231,33 +231,15 @@ export default class LickGoNote extends Plugin {
             addPianoPlayer(wrapper, xml, child);
             const frame = wrapper.createDiv({cls: "lickgo-score-frame"});
             const output = frame.createDiv({cls: "lickgo-score"});
-            const display = new OpenSheetMusicDisplay(output, {
-                autoResize: false, autoBeam: true, drawTitle: false, drawPartNames: false, backend: "svg",
-            });
-            await display.load(xml);
-            if (child.disposed) return;
             const dense = [sheet.chords, sheet.melody, sheet.voicing].some(source =>
                 splitBars(source).some(bar => words(bar).length >= 8));
-            display.zoom = 0.6;
-            const rules = display.EngravingRules;
-            rules.FixedMeasureWidth = true;
-            rules.PageLeftMargin = 0.5;
-            rules.PageRightMargin = 0.5;
-            rules.PageTopMargin = rules.PageBottomMargin;
-            rules.MeasureLeftMargin = 0.2;
-            rules.MeasureRightMargin = 0;
-            let previousWidth = 0;
-            const draw = () => {
-                if (child.disposed || !output.clientWidth || output.clientWidth === previousWidth) return;
-                previousWidth = output.clientWidth;
-                rules.RenderXMeasuresPerLineAkaSystem = dense || previousWidth < 520 ? 2 : 4;
-                try { display.render(); }
-                catch (error) { this.status(child, (error as Error).message); }
-            };
-            const observer = new ResizeObserver(draw);
-            observer.observe(output);
-            child.register(() => { observer.disconnect(); display.clear(); });
-            draw();
+            const renderer = await renderMusicXml(output, xml, {
+                measuresPerLine: dense ? 2 : 4,
+                isCurrent: () => !child.disposed,
+                onError: error => this.status(child, error.message),
+            });
+            if (child.disposed) renderer.dispose();
+            else child.register(renderer.dispose);
         } catch (error) {
             this.status(child, (error as Error).message);
         }
