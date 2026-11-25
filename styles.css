@@ -101,8 +101,15 @@
 .lickgo-score { min-width: 260px; }
 .lickgo-score svg { display: block; }
 
+.theme-dark .lickgo-score-frame {
+    background: var(--background-primary);
+    border-radius: 6px;
+}
+
 .theme-dark .lickgo-score > div {
     filter: invert(1);
+    opacity: 0.62;
+    mix-blend-mode: screen;
 }
 
 .lickgo-keyboard-modal .modal-content {
