@@ -34,10 +34,10 @@ const notes = ["C", "D", "E", "F", "G", "A", "B"];
 const flats = ["Db", "Eb", "Gb", "Ab", "Bb", "n"];
 const sharps = ["C#", "D#", "F#", "G#", "A#"];
 const octaves = ["1", "2", "3", "4", "5", "6", "7", "8"];
-const rhythms = ["1", "2", "4", "8", "12", "16", "20", "24"];
+const rhythms = ["1", "2", "4", "6", "8", "12", "16", "20", "24"];
 const chordKeys = [notes, ["b", "#", "M", "m", "o", "h", "+", "/"], ["6", "7", "9", "11", "13", "sus", "add", "alt"], ["|", "(", ")", "**"]];
 const noteKeys = [notes, flats, sharps, octaves, ["-", "!", "~", "|"]];
-const rhythmKeys = [rhythms.slice(0, 4), rhythms.slice(4), ["!", "~", "|", "*"], octaves];
+const rhythmKeys = [rhythms.slice(0, 5), rhythms.slice(5), ["!", "~", "|", "*"], octaves];
 
 class MusicKeyboard extends Modal {
     private preview!: HTMLPreElement;

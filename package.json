@@ -1,6 +1,6 @@
 {
   "name": "lickgo-note",
-  "version": "0.1.12-dark",
+  "version": "0.1.13-dark",
   "private": true,
   "scripts": {
     "build": "tsc --noEmit && esbuild src/main.ts --bundle --platform=browser --target=es2018 --format=cjs --external:obsidian --external:@codemirror/* --minify --legal-comments=linked --outfile=main.js",

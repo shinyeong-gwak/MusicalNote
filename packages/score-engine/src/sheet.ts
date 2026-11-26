@@ -4,7 +4,7 @@ type Field = typeof fields[number];
 export type Source = Record<Field, string> & {key: string; time: string; grid: number; tempo?: number; name: string};
 export const words = (text: string) => text.trim().split(/\s+/).filter(Boolean);
 const rhythms = {
-    1: [480, "whole"], 2: [240, "half"], 4: [120, "quarter"], 8: [60, "eighth"],
+    1: [480, "whole"], 2: [240, "half"], 4: [120, "quarter"], 6: [80, "quarter", 3], 8: [60, "eighth"],
     12: [40, "eighth", 3], 16: [30, "16th"], 20: [24, "16th", 5], 24: [20, "16th", 3],
 } as const;
 type Rhythm = keyof typeof rhythms;

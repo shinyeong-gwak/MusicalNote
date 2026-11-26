@@ -4,6 +4,7 @@ export type PlaybackNote = {midi: number; beat: number; length: number};
 export function readPlayback(xml: string) {
     const document = new DOMParser().parseFromString(xml, "application/xml");
     const notes: PlaybackNote[] = [];
+    const straightBeats = new Set<number>();
     const ties = new Map<string, PlaybackNote>();
     const natural: Record<string, number> = {C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11};
     let division = 10080;
@@ -27,6 +28,14 @@ export function readPlayback(xml: string) {
                     cursor += amount;
                 }
                 end = Math.max(end, start + amount);
+                if (element.querySelector("time-modification")) {
+                    // Keep the entire beat straight in both hands, including tuplet rests.
+                    // This avoids overlaps with regular notes surrounding the tuplet.
+                    for (let beat = Math.floor(measureStart + start + 1e-7);
+                        beat < Math.ceil(measureStart + start + amount - 1e-7); beat++) {
+                        straightBeats.add(beat);
+                    }
+                }
                 const pitch = element.querySelector("pitch");
                 if (!pitch) continue;
                 const midi = (Number(pitch.querySelector("octave")?.textContent) + 1) * 12 +
@@ -45,7 +54,7 @@ export function readPlayback(xml: string) {
         measureStart += end;
     }
     const tempo = Number(document.querySelector("sound[tempo]")?.getAttribute("tempo") ?? 120);
-    return {notes: notes.sort((a, b) => a.beat - b.beat), beats: measureStart, tempo};
+    return {notes: notes.sort((a, b) => a.beat - b.beat), beats: measureStart, tempo, straightBeats: [...straightBeats]};
 }
 
 // A decaying harmonic piano voice, generated locally with no audio downloads.
@@ -69,16 +78,17 @@ function piano(context: AudioContext, midi: number) {
 }
 
 // Warp each quarter-note beat into a gentle 58:42 eighth-note pair.
-export function swingBeat(beat: number) {
+export function swingBeat(beat: number, straightBeats: readonly number[] = []) {
     const whole = Math.floor(beat);
+    if (straightBeats.includes(whole)) return beat;
     const fraction = beat - whole;
     return whole + (fraction <= 0.5 ? fraction * 1.16 : 0.58 + (fraction - 0.5) * 0.84);
 }
 
-export function swingNotes(notes: PlaybackNote[]) {
+export function swingNotes(notes: PlaybackNote[], straightBeats: readonly number[] = []) {
     return notes.map(note => ({
-        ...note, beat: swingBeat(note.beat),
-        length: swingBeat(note.beat + note.length) - swingBeat(note.beat),
+        ...note, beat: swingBeat(note.beat, straightBeats),
+        length: swingBeat(note.beat + note.length, straightBeats) - swingBeat(note.beat, straightBeats),
     }));
 }
 
@@ -108,7 +118,8 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
     let bpm = score.tempo;
     let timer: number | undefined;
     let next = 0;
-    let notes = swingNotes(score.notes);
+    let endBeat = swingBeat(score.beats, score.straightBeats);
+    let notes = swingNotes(score.notes, score.straightBeats);
     const voices = new Set<AudioBufferSourceNode>();
     const cache = new Map<number, AudioBuffer>();
     const position = () => running && context ? beat + Math.max(0, context.currentTime - started) * bpm / 60 : beat;
@@ -119,7 +130,7 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
         voices.clear();
     };
     const pause = () => {
-        beat = Math.min(score.beats, position());
+        beat = Math.min(endBeat, position());
         running = false;
         silence();
         play.setText("▶ 재개");
@@ -153,7 +164,7 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
             voice.start(time);
             voice.stop(time + Math.min(duration + 0.07, 5));
         }
-        if (current >= score.beats) reset();
+        if (current >= endBeat) reset();
     };
     play.onclick = async () => {
         if (pending || disposed) return;
@@ -169,7 +180,8 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
             if (stopOtherPlayer && stopOtherPlayer !== reset) stopOtherPlayer();
             stopOtherPlayer = reset;
             bpm = value;
-            notes = swing.checked ? swingNotes(score.notes) : score.notes;
+            notes = swing.checked ? swingNotes(score.notes, score.straightBeats) : score.notes;
+            endBeat = swing.checked ? swingBeat(score.beats, score.straightBeats) : score.beats;
             next = 0;
             started = context.currentTime + 0.05;
             running = true;

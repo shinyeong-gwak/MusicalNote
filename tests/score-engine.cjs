@@ -47,3 +47,41 @@ test("ties, written accidentals and invalid ties survive extraction", () => {
     assert.ok(xml.includes("<step>G</step><alter>1</alter>"));
     assert.throws(() => engine.lickToMusicXml({melody: "| C4 D4 |", melodyRhythm: "| 2~ 2 |"}), /붙임줄/);
 });
+
+test("quarter and eighth triplets export exact MusicXML durations", () => {
+    for (const [rhythm, type, ticks, count] of [[6, "quarter", 6720, 6], [12, "eighth", 3360, 12]]) {
+        const xml = engine.lickToMusicXml({
+            melody: "| " + Array(count).fill("C4").join(" ") + " |",
+            melodyRhythm: "| " + rhythm + " *" + count + " |",
+        });
+        assert.equal((xml.match(new RegExp("<duration>" + ticks + "</duration>", "g")) || []).length, count);
+        assert.equal((xml.match(new RegExp("<type>" + type + "</type>", "g")) || []).length, count);
+        assert.equal((xml.match(/<actual-notes>3<\/actual-notes>/g) || []).length, count);
+        assert.equal((xml.match(/<tuplet type="start"/g) || []).length, count / 3);
+    }
+});
+
+test("swing keeps tuplet beats straight and preserves regular eighth swing elsewhere", () => {
+    const output = buildSync({
+        entryPoints: [path.join(root, "src/player.ts")],
+        bundle: true, platform: "node", format: "cjs", write: false,
+    }).outputFiles[0].text;
+    const moduleObject = {exports: {}};
+    new Function("module", "exports", output)(moduleObject, moduleObject.exports);
+    const notes = [
+        {midi: 60, beat: 0, length: 1 / 3},
+        {midi: 62, beat: 2 / 3, length: 1 / 3},
+        {midi: 48, beat: 0.5, length: 0.5},
+        {midi: 64, beat: 1, length: 0.5},
+        {midi: 65, beat: 1.5, length: 0.5},
+    ];
+    const swung = moduleObject.exports.swingNotes(notes, [0]);
+    for (let i = 0; i < 3; i++) {
+        assert.ok(Math.abs(swung[i].beat - notes[i].beat) < 1e-9);
+        assert.ok(Math.abs(swung[i].length - notes[i].length) < 1e-9);
+    }
+    assert.ok(Math.abs(swung[3].length - 0.58) < 1e-9);
+    assert.ok(Math.abs(swung[4].beat - 1.58) < 1e-9);
+    assert.ok(Math.abs(swung[4].length - 0.42) < 1e-9);
+    assert.equal(notes[4].beat, 1.5);
+});
