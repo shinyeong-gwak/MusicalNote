@@ -68,11 +68,11 @@ function piano(context: AudioContext, midi: number) {
     return buffer;
 }
 
-// Warp each quarter-note beat into a long/short eighth-note pair.
+// Warp each quarter-note beat into a gentle 58:42 eighth-note pair.
 export function swingBeat(beat: number) {
     const whole = Math.floor(beat);
     const fraction = beat - whole;
-    return whole + (fraction <= 0.5 ? fraction * 4 / 3 : 2 / 3 + (fraction - 0.5) * 2 / 3);
+    return whole + (fraction <= 0.5 ? fraction * 1.16 : 0.58 + (fraction - 0.5) * 0.84);
 }
 
 export function swingNotes(notes: PlaybackNote[]) {
@@ -95,8 +95,8 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
     const swingLabel = toolbar.createEl("label", {cls: "lickgo-swing"});
     const swing = swingLabel.createEl("input", {type: "checkbox", attr: {type: "checkbox", "aria-label": "8분음표 스윙"}});
     swing.checked = true;
-    swingLabel.createSpan({text: "8분 스윙"});
-    const status = toolbar.createSpan({cls: "lickgo-status", text: "피아노"});
+    swingLabel.title = "8분음표 스윙";
+    const status = toolbar.createSpan({cls: "lickgo-status", attr: {role: "status"}});
     play.disabled = !score.notes.length;
     if (!score.notes.length) status.setText("재생할 음표가 없습니다.");
     let context: AudioContext | undefined;
@@ -173,7 +173,7 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
             next = 0;
             started = context.currentTime + 0.05;
             running = true;
-            status.setText("피아노");
+            status.setText("");
             play.setText("Ⅱ 일시정지");
             schedule();
             timer = window.setInterval(schedule, 40);

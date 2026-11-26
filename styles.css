@@ -108,7 +108,7 @@
 
 .theme-dark .lickgo-score > div {
     filter: invert(1);
-    opacity: 0.14;
+    opacity: 0.11;
     mix-blend-mode: screen;
 }
 
@@ -207,3 +207,5 @@
     gap: 4px;
 }
 .lickgo-player .lickgo-swing input { width: auto; }
+
+.lickgo-player .lickgo-status:empty { display: none; }

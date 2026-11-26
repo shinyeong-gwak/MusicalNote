@@ -1,9 +1,11 @@
 import {
-    editorLivePreviewField, MarkdownRenderChild, MarkdownView, Notice,
+    editorInfoField, editorLivePreviewField, MarkdownRenderChild, MarkdownView, Notice,
     Menu, normalizePath, Plugin, TFile,
     type Editor, type MarkdownPostProcessorContext, type MarkdownSectionInformation,
 } from "obsidian";
-import { EditorView } from "@codemirror/view";
+import type { Text } from "@codemirror/state";
+import { syntaxTree } from "@codemirror/language";
+import { Decoration, EditorView, ViewPlugin, WidgetType, type ViewUpdate } from "@codemirror/view";
 import { findBlocks } from "./blocks";
 import { openMusicKeyboard } from "./keyboard";
 import { chordReference, renderChord, sheetReference, type ChordActions } from "./chord";
@@ -17,6 +19,27 @@ const chordTemplate = "```chord\n| \n```";
 class RenderedMusic extends MarkdownRenderChild {
     disposed = false;
     onunload() { this.disposed = true; }
+}
+
+const widgetChildren = new WeakMap<HTMLElement, RenderedMusic>();
+
+class ReferenceWidget extends WidgetType {
+    constructor(readonly source: string, readonly path: string, readonly doc: Text, readonly plugin: LickGoNote) { super(); }
+    eq(other: ReferenceWidget) { return this.source === other.source && this.path === other.path && this.doc === other.doc; }
+    toDOM(view: EditorView) {
+        const wrapper = view.dom.ownerDocument.createElement("span");
+        wrapper.className = "lickgo-live-reference";
+        const child = new RenderedMusic(wrapper);
+        this.plugin.addChild(child);
+        widgetChildren.set(wrapper, child);
+        this.plugin.renderReference(this.source, this.path, child, this.doc.toString());
+        return wrapper;
+    }
+    destroy(dom: HTMLElement) {
+        const child = widgetChildren.get(dom);
+        if (child) this.plugin.removeChild(child);
+        widgetChildren.delete(dom);
+    }
 }
 
 export default class LickGoNote extends Plugin {
@@ -54,7 +77,7 @@ export default class LickGoNote extends Plugin {
                 }
             }
         });
-        this.useSourceEditing();
+        this.registerLiveReferences();
         this.addCommand({id: "insert-sheet", name: "악보 블록 삽입", icon: "music", editorCallback: editor => this.insert(editor, "sheet")});
         this.addCommand({id: "insert-chord", name: "코드 블록 삽입", icon: "list-music", editorCallback: editor => this.insert(editor, "chord")});
         this.addCommand({
@@ -73,30 +96,49 @@ export default class LickGoNote extends Plugin {
         });
     }
 
-    private useSourceEditing() {
-        const updating = new WeakSet<MarkdownView>();
-        const update = () => {
-            for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
-                const view = leaf.view;
-                if (!(view instanceof MarkdownView) || view.getMode() !== "source" ||
-                    view.getState().source === true || updating.has(view)) continue;
-                updating.add(view);
-                void view.setState({...view.getState(), source: true}, {history: false})
-                    .catch(error => new Notice(`소스 편집 모드 전환 오류: ${(error as Error).message}`))
-                    .finally(() => updating.delete(view));
+    private registerLiveReferences() {
+        const plugin = this;
+        this.registerEditorExtension(ViewPlugin.fromClass(class {
+            decorations = Decoration.none;
+            constructor(view: EditorView) { this.decorate(view); }
+            update(update: ViewUpdate) { this.decorate(update.view); }
+            decorate(view: EditorView) {
+                if (!view.state.field(editorLivePreviewField, false)) {
+                    this.decorations = Decoration.none;
+                    return;
+                }
+                const path = view.state.field(editorInfoField, false)?.file?.path;
+                if (!path) {
+                    this.decorations = Decoration.none;
+                    return;
+                }
+                const widgets = [];
+                const tree = syntaxTree(view.state);
+                const selections = view.state.selection.ranges;
+                let last = 0;
+                for (const range of view.visibleRanges) {
+                    let position = range.from;
+                    while (position <= range.to) {
+                        const line = view.state.doc.lineAt(position);
+                        position = line.to + 1;
+                        if (last === line.number) continue;
+                        last = line.number;
+                        const source = line.text.trim();
+                        if (!chordReference.test(source) && !sheetReference.test(source)) continue;
+                        if (selections.some(selection => selection.from <= line.to && selection.to >= line.from)) continue;
+                        let node = tree.resolveInner(line.from + line.text.indexOf(source) + 1);
+                        let inCode = false;
+                        while (node) {
+                            if (/code|frontmatter|hmd-yaml/i.test(node.name)) { inCode = true; break; }
+                            if (!node.parent) break;
+                            node = node.parent;
+                        }
+                        if (!inCode) widgets.push(Decoration.replace({widget: new ReferenceWidget(source, path, view.state.doc, plugin)}).range(line.from, line.to));
+                    }
+                }
+                this.decorations = Decoration.set(widgets, true);
             }
-        };
-        // Source mode keeps fences and their contents editable on mobile as well.
-        this.app.workspace.onLayoutReady(update);
-        this.registerEvent(this.app.workspace.on("layout-change", update));
-        this.registerEvent(this.app.workspace.on("active-leaf-change", update));
-        this.registerEvent(this.app.workspace.on("file-open", update));
-        let timer: number | undefined;
-        this.registerEditorExtension(EditorView.updateListener.of(change => {
-            if (!change.state.field(editorLivePreviewField, false) || timer !== undefined) return;
-            timer = window.setTimeout(() => { timer = undefined; update(); }, 0);
-        }));
-        this.register(() => { if (timer !== undefined) window.clearTimeout(timer); });
+        }, { decorations: view => view.decorations }));
     }
 
     private insert(editor: Editor, type: "chord" | "sheet") {
