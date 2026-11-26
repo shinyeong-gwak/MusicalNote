@@ -216,6 +216,7 @@ function harmony(symbol: string, offset: number) {
 
 function tupletMarks(events: Note[]) {
     const marks = new Map<number, string>();
+    const beams = new Map<number, string>();
     for (let i = 0; i < events.length;) {
         const [, , size] = rhythms[events[i].value];
         if (!size) {
@@ -227,13 +228,22 @@ function tupletMarks(events: Note[]) {
         if (end - i > 1) {
             marks.set(i, '<tuplet type="start" number="1"/>');
             marks.set(end - 1, '<tuplet type="stop" number="1"/>');
+            const type = rhythms[events[i].value][1];
+            if (type !== "quarter" && events.slice(i, end).every(note => note.pitches.length > 0)) {
+                const levels = type === "16th" ? 2 : 1;
+                for (let index = i; index < end; index++) {
+                    const mark = index === i ? "begin" : index === end - 1 ? "end" : "continue";
+                    beams.set(index, Array.from({length: levels}, (_, level) =>
+                        `<beam number="${level + 1}">${mark}</beam>`).join(""));
+                }
+            }
         }
         i = end;
     }
-    return marks;
+    return {notations: marks, beams};
 }
 
-function noteXml(note: Note, staff: number, tupletMark = "") {
+function noteXml(note: Note, staff: number, tupletMark = "", beamMark = "") {
     const [ticks, type, tuplet] = rhythms[note.value];
     const timing = tuplet ? `<time-modification><actual-notes>${tuplet}</actual-notes><normal-notes>${tuplet === 5 ? 4 : 2}</normal-notes></time-modification>` : "";
     const tieTypes = [note.stop && "stop", note.start && "start"].filter(Boolean);
@@ -243,7 +253,7 @@ function noteXml(note: Note, staff: number, tupletMark = "") {
         const marks = tied + (index === 0 ? tupletMark : "");
         const notations = marks ? `<notations>${marks}</notations>` : "";
         const body = pitch ? `<pitch><step>${pitch.step}</step>${pitch.alter ? `<alter>${pitch.alter}</alter>` : ""}<octave>${pitch.octave}</octave></pitch>` : "<rest/>";
-        return `<note>${index ? "<chord/>" : ""}${body}<duration>${ticks * 84}</duration>${ties}<voice>${staff}</voice><type>${type}</type>${timing}<staff>${staff}</staff>${notations}</note>`;
+        return `<note>${index ? "<chord/>" : ""}${body}<duration>${ticks * 84}</duration>${ties}<voice>${staff}</voice><type>${type}</type>${timing}<staff>${staff}</staff>${index === 0 ? beamMark : ""}${notations}</note>`;
     }).join("");
 }
 
@@ -308,7 +318,7 @@ export function toMusicXml(source: Source): string | null {
                 const marks = tupletMarks(events);
                 events.forEach((event, index) => {
                     if (!i) notes += addHarmonies(cursor);
-                    notes += noteXml(event, staff, marks.get(index));
+                    notes += noteXml(event, staff, marks.notations.get(index), marks.beams.get(index));
                     cursor += rhythms[event.value][0] * 84;
                 });
             } else {

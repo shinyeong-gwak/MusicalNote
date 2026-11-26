@@ -85,3 +85,12 @@ test("swing keeps tuplet beats straight and preserves regular eighth swing elsew
     assert.ok(Math.abs(swung[4].length - 0.42) < 1e-9);
     assert.equal(notes[4].beat, 1.5);
 });
+
+test("separated eighth triplets have separate explicit beams", () => {
+    const xml = engine.lickToMusicXml({
+        melody: "| C4 D4 E4 F4 G4 A4 B4 C5 D5 E5 |",
+        melodyRhythm: "| 12 *3 8 *4 12 *3 |",
+    });
+    const marks = [...xml.matchAll(/<beam number="1">(.*?)<\/beam>/g)].map(match => match[1]);
+    assert.deepEqual(marks, ["begin", "continue", "end", "begin", "continue", "end"]);
+});
