@@ -85,3 +85,5 @@ MusicXML 변환은 LickGo의 파서 동작을 TypeScript로 옮겼고, 렌더러
 ## 공용 악보 엔진
 
 파서와 MusicXML 변환, 악보 렌더러는 [packages/score-engine](packages/score-engine/README.md)에 있습니다. Obsidian은 이 패키지를 직접 사용하고, LickGo에는 `npm run sync:lickgo -- /path/to/PleasePracticeJazz`로 같은 소스의 브라우저 번들을 전달합니다. 입력 문법이나 조판 변경은 공용 패키지에서 수정합니다.
+
+Shift（Ctrl/Cmd도 가능）를 누른 채 편집기의 `chord`·`sheet` 코드 블록이나 참조 줄 위에 마우스를 올리면 별도 미리보기가 나타납니다. 키를 놓거나 Escape를 누르면 닫힙니다.

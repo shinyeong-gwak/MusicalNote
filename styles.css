@@ -59,7 +59,17 @@
 
 .lickgo-chord-cells {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
     align-items: end;
+    text-align: start;
+    direction: ltr;
+}
+
+.lickgo-chord-cells > * {
+    min-width: 0;
+    justify-self: stretch;
+    text-align: start;
 }
 
 .lickgo-chord-count-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -93,7 +103,6 @@
 .lickgo-annotation > span { padding-inline: 0.25em; }
 
 @container (max-width: 420px) {
-    .lickgo-chord-cells { display: flex; flex-wrap: wrap; gap: 0 0.25em; }
     .lickgo-chord-symbol { font-size: 0.78em; }
 }
 
@@ -181,7 +190,7 @@
 }
 
 @container (max-width: 420px) {
-    .lickgo-chord-cells .lickgo-chord-button { width: auto; }
+    .lickgo-chord-cells .lickgo-chord-button { width: 100%; }
 }
 
 .lickgo-chord-cells .lickgo-chord-button {
@@ -209,3 +218,22 @@
 .lickgo-player .lickgo-swing input { width: auto; }
 
 .lickgo-player .lickgo-status:empty { display: none; }
+
+
+.theme-dark .lickgo-chart {
+    opacity: 0.11;
+}
+
+.lickgo-hover-preview {
+    position: fixed;
+    z-index: var(--layer-popover, 300);
+    width: min(680px, calc(100vw - 16px));
+    max-height: min(60vh, 520px);
+    overflow: auto;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    box-shadow: var(--shadow-s);
+}

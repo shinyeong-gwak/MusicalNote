@@ -6,6 +6,7 @@ import {
 import type { Text } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { Decoration, EditorView, ViewPlugin, WidgetType, type ViewUpdate } from "@codemirror/view";
+import { musicHoverPreview } from "./hover-preview";
 import { findBlocks } from "./blocks";
 import { openMusicKeyboard } from "./keyboard";
 import { chordReference, renderChord, sheetReference, type ChordActions } from "./chord";
@@ -78,6 +79,14 @@ export default class LickGoNote extends Plugin {
             }
         });
         this.registerLiveReferences();
+        this.registerEditorExtension(musicHoverPreview((preview, el) => {
+            const child = new RenderedMusic(el);
+            this.addChild(child);
+            if (preview.language === "sheet") void this.renderSheet(preview.source, child);
+            else if (preview.language === "chord") void this.renderChart(preview.source, preview.path, child, preview.document);
+            else this.renderReference(preview.source, preview.path, child, preview.document);
+            return () => this.removeChild(child);
+        }));
         this.addCommand({id: "insert-sheet", name: "악보 블록 삽입", icon: "music", editorCallback: editor => this.insert(editor, "sheet")});
         this.addCommand({id: "insert-chord", name: "코드 블록 삽입", icon: "list-music", editorCallback: editor => this.insert(editor, "chord")});
         this.addCommand({
