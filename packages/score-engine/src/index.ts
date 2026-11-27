@@ -27,6 +27,7 @@ export function lickToMusicXml(input: LickInput) {
 export type RenderOptions = {
     zoom?: number; measuresPerLine?: number; drawTitle?: boolean;
     isCurrent?: () => boolean; onError?: (error: Error) => void;
+    onRender?: (display: OpenSheetMusicDisplay) => void;
 };
 
 export async function renderMusicXml(output: HTMLElement, xml: string, options: RenderOptions = {}) {
@@ -63,7 +64,10 @@ export async function renderMusicXml(output: HTMLElement, xml: string, options: 
             if (!width || width === lastWidth) return;
             lastWidth = width;
             rules.RenderXMeasuresPerLineAkaSystem = width < 520 ? 2 : options.measuresPerLine ?? 4;
-            try { display.render(); }
+            try {
+                display.render();
+                options.onRender?.(display);
+            }
             catch (error) {
                 dispose();
                 options.onError?.(error as Error);

@@ -94,3 +94,18 @@ test("separated eighth triplets have separate explicit beams", () => {
     const marks = [...xml.matchAll(/<beam number="1">(.*?)<\/beam>/g)].map(match => match[1]);
     assert.deepEqual(marks, ["begin", "continue", "end", "begin", "continue", "end"]);
 });
+
+test("playhead time maps back to score beats during swing and straight tuplets", () => {
+    const output = buildSync({
+        entryPoints: [path.join(root, "src/player.ts")],
+        bundle: true, platform: "node", format: "cjs", write: false,
+    }).outputFiles[0].text;
+    const moduleObject = {exports: {}};
+    new Function("module", "exports", output)(moduleObject, moduleObject.exports);
+    const {swingBeat, straightBeat} = moduleObject.exports;
+    for (const straight of [[], [0, 3]]) {
+        for (const beat of [0, 1 / 3, 0.5, 2 / 3, 1, 1.5, 2.75, 3.5, 4]) {
+            assert.ok(Math.abs(straightBeat(swingBeat(beat, straight), straight) - beat) < 1e-9);
+        }
+    }
+});

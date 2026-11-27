@@ -92,9 +92,17 @@ export function swingNotes(notes: PlaybackNote[], straightBeats: readonly number
     }));
 }
 
+export function straightBeat(beat: number, straightBeats: readonly number[] = []) {
+    const whole = Math.floor(beat);
+    if (straightBeats.includes(whole)) return beat;
+    const fraction = beat - whole;
+    return whole + (fraction <= 0.58 ? fraction / 1.16 : 0.5 + (fraction - 0.58) / 0.84);
+}
+
 let stopOtherPlayer: (() => void) | undefined;
 
-export function addPianoPlayer(container: HTMLElement, xml: string, owner: Component) {
+export function addPianoPlayer(container: HTMLElement, xml: string, owner: Component,
+    onPosition?: (beat: number, visible: boolean) => void) {
     const score = readPlayback(xml);
     const toolbar = container.createDiv({cls: "lickgo-player", attr: {role: "group", "aria-label": "피아노 재생"}});
     const play = toolbar.createEl("button", {text: "▶ 재생", attr: {type: "button"}});
@@ -113,6 +121,8 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
     let disposed = false;
     let running = false;
     let pending = false;
+    let generation = 0;
+    let activeSwing = true;
     let beat = 0;
     let started = 0;
     let bpm = score.tempo;
@@ -123,6 +133,9 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
     const voices = new Set<AudioBufferSourceNode>();
     const cache = new Map<number, AudioBuffer>();
     const position = () => running && context ? beat + Math.max(0, context.currentTime - started) * bpm / 60 : beat;
+    const notify = (visible: boolean) => onPosition?.(
+        activeSwing ? straightBeat(Math.min(endBeat, position()), score.straightBeats)
+            : Math.min(endBeat, position()), visible);
     const silence = () => {
         if (timer !== undefined) window.clearInterval(timer);
         timer = undefined;
@@ -134,12 +147,15 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
         running = false;
         silence();
         play.setText("▶ 재개");
+        notify(true);
     };
     const reset = () => {
+        generation++;
         running = false;
         beat = 0;
         silence();
         play.setText("▶ 재생");
+        notify(false);
         if (stopOtherPlayer === reset) stopOtherPlayer = undefined;
     };
     const schedule = () => {
@@ -164,22 +180,24 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
             voice.start(time);
             voice.stop(time + Math.min(duration + 0.07, 5));
         }
+        notify(true);
         if (current >= endBeat) reset();
     };
-    play.onclick = async () => {
-        if (pending || disposed) return;
-        if (running) { pause(); return; }
+    const startPlayback = async () => {
+        if (pending || disposed || !score.notes.length) return;
         const value = Number(tempo.value);
         if (!Number.isFinite(value) || value < 1 || value > 999) { status.setText("BPM은 1–999로 입력하세요."); return; }
         pending = true;
+        const request = generation;
         play.disabled = true;
         try {
             context ??= new AudioContext();
             await context.resume();
-            if (disposed) return;
+            if (disposed || generation !== request) return;
             if (stopOtherPlayer && stopOtherPlayer !== reset) stopOtherPlayer();
             stopOtherPlayer = reset;
             bpm = value;
+            activeSwing = swing.checked;
             notes = swing.checked ? swingNotes(score.notes, score.straightBeats) : score.notes;
             endBeat = swing.checked ? swingBeat(score.beats, score.straightBeats) : score.beats;
             next = 0;
@@ -197,6 +215,7 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
             play.disabled = disposed || !score.notes.length;
         }
     };
+    play.onclick = () => { if (running) pause(); else void startPlayback(); };
     stop.onclick = reset;
     tempo.onchange = () => { if (running) pause(); };
     swing.onchange = reset;
@@ -206,4 +225,18 @@ export function addPianoPlayer(container: HTMLElement, xml: string, owner: Compo
         cache.clear();
         void context?.close();
     });
+    return {
+        seek: (scoreBeat: number) => {
+            if (disposed || pending || !score.notes.length) return;
+            silence();
+            running = false;
+            const target = Math.max(0, Math.min(score.beats, scoreBeat));
+            if (target >= score.beats) { reset(); return; }
+            activeSwing = swing.checked;
+            beat = activeSwing ? swingBeat(target, score.straightBeats) : target;
+            notify(true);
+            void startPlayback();
+        },
+        refreshPosition: () => notify(running || beat > 0),
+    };
 }

@@ -11,6 +11,7 @@ import { findBlocks } from "./blocks";
 import { openMusicKeyboard } from "./keyboard";
 import { chordReference, renderChord, sheetReference, type ChordActions } from "./chord";
 import { ChordAnnotationModal, editAnnotation } from "./chord-actions";
+import { scorePosition } from "./score-position";
 import { addPianoPlayer } from "./player";
 import { fields, parseSheet, splitBars, toMusicXml, words } from "./sheet";
 import { renderMusicXml } from "@lickgo/score-engine";
@@ -279,13 +280,16 @@ export default class LickGoNote extends Plugin {
             }
             const wrapper = child.containerEl.createDiv({cls: "lickgo-music"});
             if (sheet.name) wrapper.createDiv({cls: "lickgo-caption", text: sheet.name});
-            addPianoPlayer(wrapper, xml, child);
+            let navigator: ReturnType<typeof scorePosition> | undefined;
+            const player = addPianoPlayer(wrapper, xml, child, (beat, visible) => navigator?.setPosition(beat, visible));
             const frame = wrapper.createDiv({cls: "lickgo-score-frame"});
             const output = frame.createDiv({cls: "lickgo-score"});
+            navigator = scorePosition(output, child, player.seek);
             const dense = [sheet.chords, sheet.melody, sheet.voicing].some(source =>
                 splitBars(source).some(bar => words(bar).length >= 8));
             const renderer = await renderMusicXml(output, xml, {
                 measuresPerLine: dense ? 2 : 4,
+                onRender: display => { navigator?.rebuild(display); player.refreshPosition(); },
                 isCurrent: () => !child.disposed,
                 onError: error => this.status(child, error.message),
             });

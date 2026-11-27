@@ -237,3 +237,14 @@
     color: var(--text-normal);
     box-shadow: var(--shadow-s);
 }
+
+.lickgo-score { position: relative; }
+.lickgo-score svg { cursor: pointer; }
+.lickgo-playhead {
+    position: absolute;
+    width: 2px;
+    background: var(--text-muted);
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 2;
+}
